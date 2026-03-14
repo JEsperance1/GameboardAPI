@@ -1,0 +1,6 @@
+@GameboardAPI_HostAddress = http://localhost:5140
+
+GET {{GameboardAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
