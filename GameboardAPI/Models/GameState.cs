@@ -4,6 +4,8 @@ using System.ComponentModel.Design;
 using System.Runtime.CompilerServices;
 using System.Text;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using MySql.Data.MySqlClient;
+
 
 namespace Battleship
 {
@@ -13,13 +15,23 @@ namespace Battleship
         public bool isPlayerOneTurn;
         public int[,] opponentGameBoard;
         public int[,] myGameBoard;
-        
-        public GameState(bool gameRunning, bool isPlayerOneTurn)
+        public int totalMoves;
+
+        Random rand = new Random();
+        GameRepository gameRepository = new GameRepository();
+
+        Ship Destroyer = new Ship("Destroyer", 2);
+        Ship Submarine = new Ship("Submarine", 3);
+        Ship Cruiser = new Ship("Cruiser", 3);
+        Ship Battleship = new Ship("Battleship", 4);
+        Ship Carrier = new Ship("Carrier", 5);
+
+        public GameState(bool isPlayerOneTurn)
         {
-            this.gameRunning = gameRunning;
             this.isPlayerOneTurn = isPlayerOneTurn;
             this.opponentGameBoard = new int[10, 10];
             this.myGameBoard = new int[10, 10];
+            this.totalMoves = 0;
 
             placeShip(this.opponentGameBoard, Destroyer);
             placeShip(this.opponentGameBoard, Submarine);
@@ -32,14 +44,10 @@ namespace Battleship
             placeShip(this.myGameBoard, Cruiser);
             placeShip(this.myGameBoard, Battleship);
             placeShip(this.myGameBoard, Carrier);
+
+            
         }
 
-        Ship Destroyer = new Ship("Destroyer", 2);
-        Ship Submarine = new Ship("Submarine", 3);
-        Ship Cruiser = new Ship("Cruiser", 3);
-        Ship Battleship = new Ship("Battleship", 4);
-        Ship Carrier = new Ship("Carrier", 5);
-        Random rand = new Random();
 
         public void checkBotTurn(bool isPlayerOneTurn)
         {
@@ -47,51 +55,77 @@ namespace Battleship
             {
                 Thread.Sleep(3000);
                 this.botPlays(myGameBoard);
-                //Console.Write("\n\nbot plays logic has been triggered");
             }
         }
 
-        public void botPlays(int[,] myGameboard)
+        public bool IsOver(int[,] board)
         {
-            bool validShot = false;
-            while (!validShot)
+            for (int i = 0; i < 10; i++)
             {
-                int row_index = rand.Next(0,10);
-                int column_index = rand.Next(0, 10);
+                for (int j = 0; j < 10; j++)
+                {
+                    if (board[i, j] == 1)
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
 
-                if (myGameBoard[row_index, column_index] == 3 || myGameBoard[row_index, column_index] == 2)
+        public void endGame(int[,] losingBoard, bool gameIsOver)
+        {
+
+            if (gameIsOver)
+            {
+                if (losingBoard == this.opponentGameBoard)
                 {
-                    //Console.Write("Cannot use this spot. it has already been attacked\n");
-                }
-                else if (myGameBoard[row_index, column_index] == 1)
-                {
-                    Console.Write("Nice Hit\n");
-                    myGameBoard[row_index, column_index] = 3;
-                    validShot = true;
-                }
-                else if (myGameBoard[row_index, column_index] == 0)
-                {
-                    //Console.Write("You Missed\n");
-                    myGameBoard[row_index, column_index] = 2;
-                    validShot = true;
+                    gameRepository.saveGame("Player", this.totalMoves);
                 }
                 else
                 {
-                    //Console.Write("Invalid input, try again.\n");
+                    gameRepository.saveGame("CPU", this.totalMoves);
                 }
-                this.isPlayerOneTurn = !isPlayerOneTurn;
             }
         }
+
+        public void botPlays(int[,] myGameBoard)
+        {
+            bool validShot = false;
+
+            while (!validShot)
+            {
+                int row = rand.Next(0, 10);
+                int col = rand.Next(0, 10);
+                int cell = myGameBoard[row, col];
+
+                if (cell == 0)
+                {
+                    myGameBoard[row, col] = 2; 
+                    validShot = true;
+                }
+                else if (cell == 1)
+                {
+                    myGameBoard[row, col] = 3; 
+                    validShot = true;
+                }
+                
+            }
+
+            this.isPlayerOneTurn = true;
+        }
+
         public int[,] placeShip(int[,] board, Ship shipToBePlaced )
         {
             bool placed = false;
-
             while (!placed)
             {
+                //randomly selects a spot
                 int row = rand.Next(0, 10);
                 int col = rand.Next(0, 10);
                 bool isHorizontal = rand.Next(2) == 0;
 
+                //checks if it exceeds the board boundary
                 if (isHorizontal && col + shipToBePlaced.spaces > 10)
                 {
                     continue;
@@ -101,6 +135,8 @@ namespace Battleship
                     continue;
                 }
                 bool valid = true;
+
+                // checks for ship collisions
                 for (int i = 0; i < shipToBePlaced.spaces; i++)
                 {
                     if (isHorizontal)
@@ -124,6 +160,7 @@ namespace Battleship
                         }
                     }
                 }
+                //places ship at the verified spots on the board
                 if (valid)
                 {
                     shipToBePlaced.startCoordinate = (row, col);
